@@ -305,8 +305,8 @@ class Dench
     ensure
       # TODO handle error
       (@config.postprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
-      nodes.each{|node| node.pullall(outdir)}
       processes.each{|process| process.finalize()}
+      nodes.each{|node| node.pullall(outdir)}
       nodes.each{|node| node.finalize()}
     end
     if @config.postprocess.dench
