@@ -34,11 +34,14 @@ class DenchNode
   end
 
   public
-  def push(src, dst)
+  def prepare()
     mkdir = "ssh #{@host} 'mkdir -p #{@wd}'"
-    scp = "scp -r #{src} #{@host}:#{@wd}/#{dst}"
     puts(mkdir)
     system(mkdir)
+  end
+
+  def push(src, dst)
+    scp = "scp -r #{src} #{@host}:#{@wd}/#{dst}"
     puts(scp)
     system(scp)
   end
@@ -50,6 +53,12 @@ class DenchNode
     system(scp)
     puts(rm)
     system(rm)
+  end
+
+  def exec(cmd)
+    ssh = "ssh #{@host} 'cd #{@wd}; #{cmd}'"
+    puts(ssh)
+    system(ssh)
   end
 
   def to_s()
@@ -228,7 +237,10 @@ class Dench
     Dir.mkdir(dstdir)
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
+
     begin
+      nodes.each{|node| node.prepare()}
+      (@config.preparation.node || []).each{|p| nodes.each{|node| node.exec(p)}}
       processes.each{|process| process.prepare()}
       processes.each{|process| process.spawn()}
     ensure

@@ -14,5 +14,5 @@ preparation:
     - echo dench1
     - echo dench2
   node:
-    - echo node0
-    - echo node1
+    - echo node0 >> out
+    - echo node1 >> out
