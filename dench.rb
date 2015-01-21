@@ -161,6 +161,7 @@ class DenchProcess
     @remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{@timestamp}" # FIXME
     @local_tmpdir = File.basename(@remote_tmpdir)
     @package = nil
+    @pid = nil
   end
 
   public
@@ -170,10 +171,14 @@ class DenchProcess
   end
 
   def spawn()
-    ssh(@remote_tmpdir)
+    wd = @remote_tmpdir
+    sshcmd = "ssh #{@server.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
+    puts(sshcmd)
+    @pid = Process.spawn(sshcmd, :out => STDOUT, :err => STDERR)
   end
 
   def finalize(dstdir)
+    Process.waitpid(@pid) if @pid
     server.pull(@remote_tmpdir, "#{dstdir}/.")
     delete_package(@package)
   end
@@ -188,12 +193,6 @@ class DenchProcess
       '#!/bin/sh',
       @params.map{|param| "sh command.sh #{param}"}.join("\n")
     ].join("\n")
-  end
-
-  def ssh(wd)
-    sshcmd = "ssh #{@server.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
-    puts(sshcmd)
-    system(sshcmd)
   end
 
   def create_package()
