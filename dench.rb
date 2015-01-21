@@ -276,7 +276,10 @@ class Dench
 
   public
   def run(script_path, parameters)
-    dstdir = "dench.result.#{@config.name}"
+    dstdir = "dench.#{@config.name}"
+    if File.exist?(dstdir)
+      raise("destination directory #{dstdir} already exist.")
+    end
     Dir.mkdir(dstdir)
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
