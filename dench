@@ -287,8 +287,8 @@ class Dench
     processes = gen_processes(nodes, script_path, parameters)
 
     if @config.preprocess.dench
-      @config.preprocess.dench.each do |p|
-        cmd = "cd #{outdir}; #{p}"
+      @config.preprocess.dench.each_with_index do |p, i|
+        cmd = "cd #{outdir}; #{p} > preprocess.#{i}.stdout.log 2> preprocess.#{i}.stderr.log"
         puts(cmd)
         system(cmd)
       end
@@ -306,8 +306,8 @@ class Dench
       nodes.each{|node| node.finalize()}
     end
     if @config.postprocess.dench
-      @config.postprocess.dench.each do |p|
-        cmd = "cd #{outdir}; #{p}"
+      @config.postprocess.dench.each_with_index do |p, i|
+        cmd = "cd #{outdir}; #{p} > postprocess.#{i}.stdout.log 2> postprocess.#{i}.stderr.log"
         puts(cmd)
         system(cmd)
       end
