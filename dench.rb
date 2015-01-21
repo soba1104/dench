@@ -23,7 +23,7 @@ if parameter_path.instance_of?(String) && File.exist?(parameter_path)
   parameters = File.read(parameter_path).split("\n")
 end
 
-class Server
+class DenchNode
   attr_reader :host, :process
 
   def initialize(host, process)
@@ -51,28 +51,28 @@ class Server
   end
 end
 
-class Preparation
-  attr_accessor :dench, :server
+class DenchPreparation
+  attr_accessor :dench, :node
 
   def initialize()
     @dench = nil
-    @server = nil
+    @node = nil
   end
 
   public
   def to_s()
     [
       "-dench: #{@dench}",
-      "-server: #{@server}",
+      "-node: #{@node}",
     ].join("\n")
   end
 end
 
 class DenchConfig
-  attr_reader :servers, :preparation
+  attr_reader :nodes, :preparation
 
   def initialize(config_hash)
-    @servers = parse_server_config(config_hash)
+    @nodes = parse_node_config(config_hash)
     @preparation = parse_preparation_config(config_hash)
   end
 
@@ -82,11 +82,11 @@ class DenchConfig
   end
 
   private
-  def parse_server_config(config_hash)
-    unless config_hash['servers']
-      raise("invalid config: servers are not specified")
+  def parse_node_config(config_hash)
+    unless config_hash['nodes']
+      raise("invalid config: nodes are not specified")
     end
-    config_hash['servers'].map{|s|
+    config_hash['nodes'].map{|s|
       host = s['host']
       unless host 
         raise("invalid config: host is not specified")
@@ -95,34 +95,34 @@ class DenchConfig
       unless process
         raise("invalid config: process is not specified")
       end
-      Server.new(host, process)
+      DenchNode.new(host, process)
     }
   end
 
   def parse_preparation_config(config_hash)
-    preparation = Preparation.new()
+    preparation = DenchPreparation.new()
     preparation_config = config_hash['preparation']
     return preparation unless preparation_config
     if preparation_config['dench']
       preparation.dench = preparation_config['dench']
     end
-    if preparation_config['server']
-      preparation.server = preparation_config['server']
+    if preparation_config['node']
+      preparation.node = preparation_config['node']
     end
     preparation
   end
 
   def to_s()
     [
-      "---------- servers ----------",
-      @servers,
+      "---------- nodes ----------",
+      @nodes,
       "---------- preparation ----------",
       @preparation,
     ].flatten.join("\n")
   end
 end
 
-class Package
+class DenchPackage
   attr_reader :script
 
   def initialize(script, tmpdir)
@@ -134,7 +134,7 @@ class Package
   def self.create(script_path, runner)
     tmpdir = Dir.mktmpdir(nil, Dir.getwd())
     script = File.basename(script_path)
-    package = Package.new(script, tmpdir)
+    package = DenchPackage.new(script, tmpdir)
     FileUtils.copy(script_path, File.join(tmpdir, 'command.sh'))
     File.write(File.join(tmpdir, 'runner.sh'), runner)
     package
@@ -150,15 +150,15 @@ class Package
 end
 
 class DenchProcess
-  attr_reader :id, :server, :params
+  attr_reader :id, :node, :params
 
-  def initialize(id, timestamp, server, script_path, params)
+  def initialize(id, timestamp, node, script_path, params)
     @id = id
     @timestamp = timestamp
-    @server = server
+    @node = node
     @script_path = script_path
     @params = params
-    @remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{@timestamp}" # FIXME
+    @remote_tmpdir = "/tmp/dench.#{@node.host}.#{@id}.#{@timestamp}" # FIXME
     @local_tmpdir = File.basename(@remote_tmpdir)
     @package = nil
     @pid = nil
@@ -167,24 +167,24 @@ class DenchProcess
   public
   def prepare()
     @package = create_package()
-    server.push(@package, @remote_tmpdir)
+    node.push(@package, @remote_tmpdir)
   end
 
   def spawn()
     wd = @remote_tmpdir
-    sshcmd = "ssh #{@server.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
+    sshcmd = "ssh #{@node.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
     puts(sshcmd)
     @pid = Process.spawn(sshcmd, :out => STDOUT, :err => STDERR)
   end
 
   def finalize(dstdir)
     Process.waitpid(@pid) if @pid
-    server.pull(@remote_tmpdir, "#{dstdir}/.")
+    node.pull(@remote_tmpdir, "#{dstdir}/.")
     delete_package(@package)
   end
 
   def to_s()
-    "#{@id}: host = #{@server.host}, params = #{@params}"
+    "#{@id}: host = #{@node.host}, params = #{@params}"
   end
 
   private
@@ -196,7 +196,7 @@ class DenchProcess
   end
 
   def create_package()
-    Package.create(@script_path, runner())
+    DenchPackage.create(@script_path, runner())
   end
 
   def delete_package(package)
@@ -221,7 +221,7 @@ class Dench
     timestamp = Time.now.to_i()
     dstdir = "dench.result.#{timestamp}"
     Dir.mkdir(dstdir)
-    processes = gen_processes(timestamp, @config.servers, script_path, parameters)
+    processes = gen_processes(timestamp, @config.nodes, script_path, parameters)
     begin
       processes.each{|process| process.prepare()}
       processes.each{|process| process.spawn()}
@@ -231,15 +231,15 @@ class Dench
   end
 
   private
-  def gen_processes(timestamp, servers, script_path, parameters)
-    numprocs = servers.inject(0){|i, s| i + s.process}
+  def gen_processes(timestamp, nodes, script_path, parameters)
+    numprocs = nodes.inject(0){|i, s| i + s.process}
     process_params = Array.new(numprocs).map{[]}
     parameters.each_with_index{|param, idx|
       process_params[idx % process_params.size].push(param)
     }
     processes = []
-    servers.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|server, id|
-      processes.push(DenchProcess.new(id, timestamp, server, script_path, process_params[id]))
+    nodes.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|node, id|
+      processes.push(DenchProcess.new(id, timestamp, node, script_path, process_params[id]))
     }
     processes
   end

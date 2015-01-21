@@ -1,4 +1,4 @@
-servers:
+nodes:
   -
     host: localhost
     process: 3
@@ -13,6 +13,6 @@ preparation:
     - echo dench0
     - echo dench1
     - echo dench2
-  server:
-    - echo server0
-    - echo server1
+  node:
+    - echo node0
+    - echo node1
