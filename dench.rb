@@ -160,18 +160,22 @@ class DenchProcess
     @params = params
     @remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{@timestamp}" # FIXME
     @local_tmpdir = File.basename(@remote_tmpdir)
+    @package = nil
   end
 
   public
-  def exec(dstdir)
-    begin
-      package = create_package()
-      server.push(package, @remote_tmpdir)
-      ssh(@remote_tmpdir)
-      server.pull(@remote_tmpdir, "#{dstdir}/.")
-    ensure
-      delete_package(package)
-    end
+  def prepare()
+    @package = create_package()
+    server.push(@package, @remote_tmpdir)
+  end
+
+  def spawn()
+    ssh(@remote_tmpdir)
+  end
+
+  def finalize(dstdir)
+    server.pull(@remote_tmpdir, "#{dstdir}/.")
+    delete_package(@package)
   end
 
   def to_s()
@@ -219,8 +223,11 @@ class Dench
     dstdir = "dench.result.#{timestamp}"
     Dir.mkdir(dstdir)
     processes = gen_processes(timestamp, @config.servers, script_path, parameters)
-    processes.each do |process|
-      process.exec(dstdir)
+    begin
+      processes.each{|process| process.prepare()}
+      processes.each{|process| process.spawn()}
+    ensure
+      processes.each{|process| process.finalize(dstdir)}
     end
   end
 
