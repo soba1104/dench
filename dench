@@ -281,14 +281,14 @@ class Dench
   end
 
   public
-  def run(script_path, parameters, dstdir)
-    Dir.mkdir(dstdir)
+  def run(script_path, parameters, outdir)
+    Dir.mkdir(outdir)
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
 
     if @config.preprocess.dench
       @config.preprocess.dench.each do |p|
-        cmd = "cd #{dstdir}; #{p}"
+        cmd = "cd #{outdir}; #{p}"
         puts(cmd)
         system(cmd)
       end
@@ -301,13 +301,13 @@ class Dench
     ensure
       # TODO handle error
       (@config.postprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
-      nodes.each{|node| node.pullall(dstdir)}
+      nodes.each{|node| node.pullall(outdir)}
       processes.each{|process| process.finalize()}
       nodes.each{|node| node.finalize()}
     end
     if @config.postprocess.dench
       @config.postprocess.dench.each do |p|
-        cmd = "cd #{dstdir}; #{p}"
+        cmd = "cd #{outdir}; #{p}"
         puts(cmd)
         system(cmd)
       end
