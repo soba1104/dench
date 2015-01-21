@@ -49,7 +49,7 @@ class Preparation
   end
 end
 
-class Config
+class DenchConfig
   attr_reader :servers, :preparation
 
   def initialize(config_hash)
@@ -147,31 +147,31 @@ class Dench
     timestamp = Time.now.to_i()
     local_dstdir = "dench.#{timestamp}"
     Dir.mkdir(local_dstdir)
-    package = nil
-    begin
-      package = create_package(script_path)
-      @config.servers.each_with_index do |server, idx|
+    @config.servers.each_with_index do |server, idx|
+      package = nil
+      begin
+        package = create_package(script_path, server)
         remote_tmpdir = "/tmp/dench.#{server.host}.#{idx}.#{timestamp}" # FIXME
         local_tmpdir = File.basename(remote_tmpdir)
         push(package, server, remote_tmpdir)
         ssh(server, remote_tmpdir)
         pull(server, remote_tmpdir, local_dstdir)
+      ensure
+        delete_package(package)
       end
-    ensure
-      delete_package(package)
     end
   end
 
   private
-  def create_package(script_path)
-    Package.create(script_path, runner())
+  def create_package(script_path, server)
+    Package.create(script_path, runner(server))
   end
 
   def delete_package(package)
     package.destroy() if package
   end
 
-  def runner()
+  def runner(server)
     return <<-EOS
 #!/bin/sh
 sh command.sh
@@ -200,6 +200,6 @@ sh command.sh
 end
 
 config_hash = YAML.load(File.read(config_path))
-config = Config.parse(config_hash)
+config = DenchConfig.parse(config_hash)
 dench = Dench.new(config)
 dench.run(script_path)
