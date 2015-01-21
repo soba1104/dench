@@ -145,7 +145,7 @@ class Dench
     end
 
     timestamp = Time.now.to_i()
-    local_dstdir = "dench.#{timestamp}"
+    local_dstdir = "dench.result.#{timestamp}"
     Dir.mkdir(local_dstdir)
     @config.servers.each_with_index do |server, idx|
       package = nil
