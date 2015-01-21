@@ -11,6 +11,7 @@ options = {}
 opt.on('-c config', '(必須)設定ファイルのパス') {|v| options[:config] = v}
 opt.on('-s script', '(必須)実行するスクリプトのパス') {|v| options[:script] = v}
 opt.on('-n name', '(必須)実行する処理の識別子、出力先やテンポラリディレクトリの名前を識別するのに使う') {|v| options[:name] = v}
+opt.on('-o [output]', '結果の出力先、デフォルトではカレントディレクトリの dench.name に出力') {|v| options[:output] = v}
 opt.on('-p [params]', 'パラメータファイルのパス') {|v| options[:params] = v}
 opt.parse!(ARGV)
 
@@ -18,21 +19,26 @@ name = options[:name]
 config_path = options[:config]
 script_path = options[:script]
 parameter_path = options[:params]
+output = options[:output] || "dench.output.#{name}"
 parameters = []
 unless File.exist?(config_path)
-  puts("#{config_path} does not exist.")
+  STDERR.puts("#{config_path} does not exist.")
   exit(1)
 end
 unless File.exist?(script_path)
-  puts("#{script_path} does not exist.")
+  STDERR.puts("#{script_path} does not exist.")
   exit(1)
 end
 if parameter_path.instance_of?(String)
   unless File.exist?(parameter_path)
-    puts("#{parameter_path} does not exist.")
+    STDERR.puts("#{parameter_path} does not exist.")
     exit(1)
   end
   parameters = File.read(parameter_path).split("\n")
+end
+if (File.exist?(output))
+  STDERR.puts("output directory #{output} already exist.")
+  exit(1)
 end
 
 class DenchNode
@@ -275,11 +281,7 @@ class Dench
   end
 
   public
-  def run(script_path, parameters)
-    dstdir = "dench.#{@config.name}"
-    if File.exist?(dstdir)
-      raise("destination directory #{dstdir} already exist.")
-    end
+  def run(script_path, parameters, dstdir)
     Dir.mkdir(dstdir)
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
@@ -330,4 +332,4 @@ end
 config_hash = YAML.load(File.read(config_path))
 config = DenchConfig.parse(name, config_hash)
 dench = Dench.new(config)
-dench.run(script_path, parameters)
+dench.run(script_path, parameters, output)
