@@ -229,18 +229,18 @@ class Dench
 
   public
   def run(script_path, parameters)
-    if @config.preparation.dench
-      @config.preparation.dench.each do |p|
-        puts "##### preparation.dench: #{p} #####"
-        puts `#{p}`
-      end
-    end
-
     dstdir = "dench.result.#{@config.name}"
     Dir.mkdir(dstdir)
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
 
+    if @config.preparation.dench
+      @config.preparation.dench.each do |p|
+        cmd = "cd #{dstdir}; #{p}"
+        puts(cmd)
+        system(cmd)
+      end
+    end
     begin
       nodes.each{|node| node.prepare()}
       (@config.preparation.node || []).each{|p| nodes.each{|node| node.exec(p)}}

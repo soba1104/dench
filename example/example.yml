@@ -10,9 +10,9 @@ nodes:
     process: 7
 preparation:
   dench:
-    - echo dench0
-    - echo dench1
-    - echo dench2
+    - echo dench0 >> out_dench
+    - echo dench1 >> out_dench
+    - echo dench2 >> out_dench
   node:
-    - echo node0 >> out
-    - echo node1 >> out
+    - echo node0 >> out_node
+    - echo node1 >> out_node
