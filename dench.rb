@@ -120,16 +120,16 @@ end
 class DenchConfig
   attr_reader :nodes, :preprocess, :postprocess, :name
 
-  def initialize(config_hash)
-    @name = "timestamp#{Time.now.to_i}"
+  def initialize(name, config_hash)
+    @name = name
     @nodes = parse_node_config(config_hash)
     @preprocess = parse_preprocess_config(config_hash)
     @postprocess = parse_postprocess_config(config_hash)
   end
 
   public
-  def self.parse(config_hash)
-    self.new(config_hash)
+  def self.parse(name, config_hash)
+    self.new(name, config_hash)
   end
 
   private
@@ -325,6 +325,6 @@ class Dench
 end
 
 config_hash = YAML.load(File.read(config_path))
-config = DenchConfig.parse(config_hash)
+config = DenchConfig.parse(name, config_hash)
 dench = Dench.new(config)
 dench.run(script_path, parameters)
