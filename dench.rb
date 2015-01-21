@@ -35,13 +35,21 @@ class DenchNode
 
   public
   def push(src, dst)
-    system("ssh #{@host} 'mkdir -p #{@wd}'")
-    system("scp -r #{src} #{@host}:#{@wd}/#{dst}")
+    mkdir = "ssh #{@host} 'mkdir -p #{@wd}'"
+    scp = "scp -r #{src} #{@host}:#{@wd}/#{dst}"
+    puts(mkdir)
+    system(mkdir)
+    puts(scp)
+    system(scp)
   end
 
   def pullall(dst)
-    system("scp -r #{@host}:#{@wd} #{dst}")
-    system("ssh #{@host} rm -rf #{@wd}")
+    scp = "scp -r #{@host}:#{@wd} #{dst}"
+    rm = "ssh #{@host} rm -rf #{@wd}"
+    puts(scp)
+    system(scp)
+    puts(rm)
+    system(rm)
   end
 
   def to_s()
