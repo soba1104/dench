@@ -24,9 +24,10 @@ if parameter_path.instance_of?(String) && File.exist?(parameter_path)
 end
 
 class DenchNode
-  attr_reader :host, :process
+  attr_reader :id, :host, :process
 
-  def initialize(host, process)
+  def initialize(id, host, process)
+    @id = id
     @host = host
     @process = process
   end
@@ -69,9 +70,10 @@ class DenchPreparation
 end
 
 class DenchConfig
-  attr_reader :nodes, :preparation
+  attr_reader :nodes, :preparation, :name
 
   def initialize(config_hash)
+    @name = "timestamp#{Time.now.to_i}"
     @nodes = parse_node_config(config_hash)
     @preparation = parse_preparation_config(config_hash)
   end
@@ -86,6 +88,7 @@ class DenchConfig
     unless config_hash['nodes']
       raise("invalid config: nodes are not specified")
     end
+    id = 0
     config_hash['nodes'].map{|s|
       host = s['host']
       unless host 
@@ -95,7 +98,7 @@ class DenchConfig
       unless process
         raise("invalid config: process is not specified")
       end
-      DenchNode.new(host, process)
+      DenchNode.new("#{@name}_#{id += 1}", host, process)
     }
   end
 
@@ -152,13 +155,12 @@ end
 class DenchProcess
   attr_reader :id, :node, :params
 
-  def initialize(id, timestamp, node, script_path, params)
+  def initialize(id, node, script_path, params)
     @id = id
-    @timestamp = timestamp
     @node = node
     @script_path = script_path
     @params = params
-    @remote_tmpdir = "/tmp/dench.#{@node.host}.#{@id}.#{@timestamp}" # FIXME
+    @remote_tmpdir = "/tmp/dench.#{@node.host}.#{@id}" # FIXME
     @local_tmpdir = File.basename(@remote_tmpdir)
     @package = nil
     @pid = nil
@@ -218,10 +220,9 @@ class Dench
       end
     end
 
-    timestamp = Time.now.to_i()
-    dstdir = "dench.result.#{timestamp}"
+    dstdir = "dench.result.#{@config.name}"
     Dir.mkdir(dstdir)
-    processes = gen_processes(timestamp, @config.nodes, script_path, parameters)
+    processes = gen_processes(@config.nodes, script_path, parameters)
     begin
       processes.each{|process| process.prepare()}
       processes.each{|process| process.spawn()}
@@ -231,15 +232,15 @@ class Dench
   end
 
   private
-  def gen_processes(timestamp, nodes, script_path, parameters)
+  def gen_processes(nodes, script_path, parameters)
     numprocs = nodes.inject(0){|i, s| i + s.process}
     process_params = Array.new(numprocs).map{[]}
     parameters.each_with_index{|param, idx|
       process_params[idx % process_params.size].push(param)
     }
     processes = []
-    nodes.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|node, id|
-      processes.push(DenchProcess.new(id, timestamp, node, script_path, process_params[id]))
+    nodes.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|node, i|
+      processes.push(DenchProcess.new("#{node.id}.#{i}", node, script_path, process_params[i]))
     }
     processes
   end
