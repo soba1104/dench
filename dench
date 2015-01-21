@@ -249,8 +249,11 @@ class DenchProcess
     @pid = Process.spawn(sshcmd, :out => STDOUT, :err => STDERR)
   end
 
-  def finalize()
+  def join()
     Process.waitpid(@pid) if @pid
+  end
+
+  def finalize()
     delete_package(@package)
   end
 
@@ -303,6 +306,7 @@ class Dench
       processes.each{|process| process.prepare()}
       start = Time.now()
       processes.each{|process| process.spawn()}
+      processes.each{|process| process.join()}
       File.write(File.join(outdir, 'time'), Time.now() - start)
     ensure
       # TODO handle error
