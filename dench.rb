@@ -152,13 +152,32 @@ end
 class DenchProcess
   attr_reader :id, :server, :params
 
-  def initialize(id, server, params)
+  def initialize(id, server, script_path, params)
     @id = id
     @server = server
+    @script_path = script_path
     @params = params
   end
 
   public
+  def exec(timestamp, dstdir)
+    begin
+      package = create_package()
+      remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{timestamp}" # FIXME
+      local_tmpdir = File.basename(remote_tmpdir)
+      server.push(package, remote_tmpdir)
+      ssh(remote_tmpdir)
+      server.pull(remote_tmpdir, "#{dstdir}/.")
+    ensure
+      delete_package(package)
+    end
+  end
+
+  def to_s()
+    "#{@id}: host = #{@server.host}, params = #{@params}"
+  end
+
+  private
   def runner()
     [
       '#!/bin/sh',
@@ -166,8 +185,18 @@ class DenchProcess
     ].join("\n")
   end
 
-  def to_s()
-    "#{@id}: host = #{@server.host}, params = #{@params}"
+  def ssh(wd)
+    sshcmd = "ssh #{@server.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
+    puts(sshcmd)
+    system(sshcmd)
+  end
+
+  def create_package()
+    Package.create(@script_path, runner())
+  end
+
+  def delete_package(package)
+    package.destroy() if package
   end
 end
 
@@ -186,34 +215,16 @@ class Dench
     end
 
     timestamp = Time.now.to_i()
-    local_dstdir = "dench.result.#{timestamp}"
-    Dir.mkdir(local_dstdir)
-    gen_processes(@config.servers, parameters).each do |process|
-      server = process.server
-      package = nil
-      begin
-        package = create_package(script_path, process)
-        remote_tmpdir = "/tmp/dench.#{server.host}.#{process.id}.#{timestamp}" # FIXME
-        local_tmpdir = File.basename(remote_tmpdir)
-        server.push(package, remote_tmpdir)
-        ssh(server, remote_tmpdir)
-        server.pull(remote_tmpdir, "#{local_dstdir}/.")
-      ensure
-        delete_package(package)
-      end
+    dstdir = "dench.result.#{timestamp}"
+    Dir.mkdir(dstdir)
+    processes = gen_processes(@config.servers, script_path, parameters)
+    processes.each do |process|
+      process.exec(timestamp, dstdir)
     end
   end
 
   private
-  def create_package(script_path, process)
-    Package.create(script_path, process.runner())
-  end
-
-  def delete_package(package)
-    package.destroy() if package
-  end
-
-  def gen_processes(servers, parameters)
+  def gen_processes(servers, script_path, parameters)
     numprocs = servers.inject(0){|i, s| i + s.process}
     process_params = Array.new(numprocs).map{[]}
     parameters.each_with_index{|param, idx|
@@ -221,15 +232,9 @@ class Dench
     }
     processes = []
     servers.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|server, id|
-      processes.push(DenchProcess.new(id, server, process_params[id]))
+      processes.push(DenchProcess.new(id, server, script_path, process_params[id]))
     }
     processes
-  end
-
-  def ssh(server, remote_tmpdir)
-    sshcmd = "ssh #{server.host} 'cd #{remote_tmpdir}; sh runner.sh > stdout.log 2> stderr.log'"
-    puts(sshcmd)
-    system(sshcmd)
   end
 end
 
