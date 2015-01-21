@@ -5,6 +5,8 @@ require 'socket'
 
 config_path = ARGV.shift()
 script_path = ARGV.shift()
+parameter_path = ARGV.shift()
+parameters = []
 unless config_path && script_path
   puts('usage: ruby dench.rb config_path script_path')
   exit(1)
@@ -16,6 +18,9 @@ end
 unless File.exist?(script_path)
   puts("#{script_path} does not exist")
   exit(1)
+end
+if parameter_path.instance_of?(String) && File.exist?(parameter_path)
+  parameters = File.read(parameter_path).split("\n")
 end
 
 class Server
@@ -130,13 +135,28 @@ class Package
   end
 end
 
+class DenchProcess
+  attr_reader :id, :server, :params
+
+  def initialize(id, server, params)
+    @id = id
+    @server = server
+    @params = params
+  end
+
+  public
+  def to_s()
+    "#{@id}: host = #{@server.host}, params = #{@params}"
+  end
+end
+
 class Dench
   def initialize(config)
     @config = config
   end
 
   public
-  def run(script_path)
+  def run(script_path, parameters)
     if @config.preparation.dench
       @config.preparation.dench.each do |p|
         puts "##### preparation.dench: #{p} #####"
@@ -147,11 +167,12 @@ class Dench
     timestamp = Time.now.to_i()
     local_dstdir = "dench.result.#{timestamp}"
     Dir.mkdir(local_dstdir)
-    @config.servers.each_with_index do |server, idx|
+    gen_processes(@config.servers, parameters).each do |process|
+      server = process.server
       package = nil
       begin
-        package = create_package(script_path, server)
-        remote_tmpdir = "/tmp/dench.#{server.host}.#{idx}.#{timestamp}" # FIXME
+        package = create_package(script_path, process)
+        remote_tmpdir = "/tmp/dench.#{server.host}.#{process.id}.#{timestamp}" # FIXME
         local_tmpdir = File.basename(remote_tmpdir)
         push(package, server, remote_tmpdir)
         ssh(server, remote_tmpdir)
@@ -163,19 +184,32 @@ class Dench
   end
 
   private
-  def create_package(script_path, server)
-    Package.create(script_path, runner(server))
+  def create_package(script_path, process)
+    Package.create(script_path, runner(process))
   end
 
   def delete_package(package)
     package.destroy() if package
   end
 
-  def runner(server)
-    return <<-EOS
-#!/bin/sh
-sh command.sh
-    EOS
+  def gen_processes(servers, parameters)
+    numprocs = servers.inject(0){|i, s| i + s.process}
+    process_params = Array.new(numprocs).map{[]}
+    parameters.each_with_index{|param, idx|
+      process_params[idx % process_params.size].push(param)
+    }
+    processes = []
+    servers.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|server, id|
+      processes.push(DenchProcess.new(id, server, process_params[id]))
+    }
+    processes
+  end
+
+  def runner(process)
+    [
+      '#!/bin/sh',
+      process.params.map{|param| "sh command.sh #{param}"}.join("\n")
+    ].join("\n")
   end
 
   def push(package, server, remote_tmpdir)
@@ -202,4 +236,4 @@ end
 config_hash = YAML.load(File.read(config_path))
 config = DenchConfig.parse(config_hash)
 dench = Dench.new(config)
-dench.run(script_path)
+dench.run(script_path, parameters)
