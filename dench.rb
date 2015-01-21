@@ -1,25 +1,37 @@
+#!/usr/bin/env ruby
+# coding: utf-8
 require 'yaml'
 require 'tempfile'
 require 'fileutils'
 require 'socket'
+require 'optparse'
 
-config_path = ARGV.shift()
-script_path = ARGV.shift()
-parameter_path = ARGV.shift()
+opt = OptionParser.new()
+options = {}
+opt.on('-c config', '(必須)設定ファイルのパス') {|v| options[:config] = v}
+opt.on('-s script', '(必須)実行するスクリプトのパス') {|v| options[:script] = v}
+opt.on('-n name', '(必須)実行する処理の識別子、出力先やテンポラリディレクトリの名前を識別するのに使う') {|v| options[:name] = v}
+opt.on('-p [params]', 'パラメータファイルのパス') {|v| options[:params] = v}
+opt.parse!(ARGV)
+
+name = options[:name]
+config_path = options[:config]
+script_path = options[:script]
+parameter_path = options[:params]
 parameters = []
-unless config_path && script_path
-  puts('usage: ruby dench.rb config_path script_path')
-  exit(1)
-end
 unless File.exist?(config_path)
-  puts("#{config_path} does not exist")
+  puts("#{config_path} does not exist.")
   exit(1)
 end
 unless File.exist?(script_path)
-  puts("#{script_path} does not exist")
+  puts("#{script_path} does not exist.")
   exit(1)
 end
-if parameter_path.instance_of?(String) && File.exist?(parameter_path)
+if parameter_path.instance_of?(String)
+  unless File.exist?(parameter_path)
+    puts("#{parameter_path} does not exist.")
+    exit(1)
+  end
   parameters = File.read(parameter_path).split("\n")
 end
 
