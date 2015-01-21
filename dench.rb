@@ -40,6 +40,12 @@ class DenchNode
     system(mkdir)
   end
 
+  def finalize()
+    rm = "ssh #{@host} rm -rf #{@wd}"
+    puts(rm)
+    system(rm)
+  end
+
   def push(src, dst)
     scp = "scp -r #{src} #{@host}:#{@wd}/#{dst}"
     puts(scp)
@@ -48,11 +54,8 @@ class DenchNode
 
   def pullall(dst)
     scp = "scp -r #{@host}:#{@wd} #{dst}"
-    rm = "ssh #{@host} rm -rf #{@wd}"
     puts(scp)
     system(scp)
-    puts(rm)
-    system(rm)
   end
 
   def exec(cmd)
@@ -245,8 +248,9 @@ class Dench
       processes.each{|process| process.spawn()}
     ensure
       # TODO handle error
-      processes.each{|process| process.finalize()}
       nodes.each{|node| node.pullall(dstdir)}
+      processes.each{|process| process.finalize()}
+      nodes.each{|node| node.finalize()}
     end
   end
 
