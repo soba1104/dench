@@ -32,6 +32,20 @@ class Server
   end
 
   public
+  def push(src, dst)
+    pushcmd = "scp -r #{src} #{@host}:#{dst}"
+    puts(pushcmd)
+    system(pushcmd)
+  end
+
+  def pull(src, dst)
+    pullcmd = "scp -r #{@host}:#{src} #{dst}"
+    puts(pullcmd)
+    system(pullcmd)
+    rmcmd = "ssh #{@host} rm -rf #{src}"
+    system(rmcmd)
+  end
+
   def to_s()
     "-#{@host}: process = #{@process}"
   end
@@ -145,6 +159,13 @@ class DenchProcess
   end
 
   public
+  def runner()
+    [
+      '#!/bin/sh',
+      @params.map{|param| "sh command.sh #{param}"}.join("\n")
+    ].join("\n")
+  end
+
   def to_s()
     "#{@id}: host = #{@server.host}, params = #{@params}"
   end
@@ -174,9 +195,9 @@ class Dench
         package = create_package(script_path, process)
         remote_tmpdir = "/tmp/dench.#{server.host}.#{process.id}.#{timestamp}" # FIXME
         local_tmpdir = File.basename(remote_tmpdir)
-        push(package, server, remote_tmpdir)
+        server.push(package, remote_tmpdir)
         ssh(server, remote_tmpdir)
-        pull(server, remote_tmpdir, local_dstdir)
+        server.pull(remote_tmpdir, "#{local_dstdir}/.")
       ensure
         delete_package(package)
       end
@@ -185,7 +206,7 @@ class Dench
 
   private
   def create_package(script_path, process)
-    Package.create(script_path, runner(process))
+    Package.create(script_path, process.runner())
   end
 
   def delete_package(package)
@@ -205,31 +226,10 @@ class Dench
     processes
   end
 
-  def runner(process)
-    [
-      '#!/bin/sh',
-      process.params.map{|param| "sh command.sh #{param}"}.join("\n")
-    ].join("\n")
-  end
-
-  def push(package, server, remote_tmpdir)
-    pushcmd = "scp -r #{package} #{server.host}:#{remote_tmpdir}"
-    puts(pushcmd)
-    system(pushcmd)
-  end
-
   def ssh(server, remote_tmpdir)
     sshcmd = "ssh #{server.host} 'cd #{remote_tmpdir}; sh runner.sh > stdout.log 2> stderr.log'"
     puts(sshcmd)
     system(sshcmd)
-  end
-
-  def pull(server, remote_tmpdir, local_dstdir)
-    pullcmd = "scp -r #{server.host}:#{remote_tmpdir} #{local_dstdir}/."
-    puts(pullcmd)
-    system(pullcmd)
-    rmcmd = "ssh #{server.host} rm -rf #{remote_tmpdir}"
-    system(rmcmd)
   end
 end
 
