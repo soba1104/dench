@@ -286,6 +286,7 @@ class Dench
   def run(script_path, parameters, outdir)
     Dir.mkdir(outdir)
     File.write(File.join(outdir, 'config.yml'), @yaml)
+    File.write(File.join(outdir, 'params'), parameters.join("\n"))
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
 
