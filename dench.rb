@@ -69,7 +69,26 @@ class DenchNode
   end
 end
 
-class DenchPreparation
+# FIXME
+class DenchPreprocess
+  attr_accessor :dench, :node
+
+  def initialize()
+    @dench = nil
+    @node = nil
+  end
+
+  public
+  def to_s()
+    [
+      "-dench: #{@dench}",
+      "-node: #{@node}",
+    ].join("\n")
+  end
+end
+
+# FIXME
+class DenchPostprocess
   attr_accessor :dench, :node
 
   def initialize()
@@ -87,12 +106,13 @@ class DenchPreparation
 end
 
 class DenchConfig
-  attr_reader :nodes, :preprocess, :name
+  attr_reader :nodes, :preprocess, :postprocess, :name
 
   def initialize(config_hash)
     @name = "timestamp#{Time.now.to_i}"
     @nodes = parse_node_config(config_hash)
     @preprocess = parse_preprocess_config(config_hash)
+    @postprocess = parse_postprocess_config(config_hash)
   end
 
   public
@@ -119,8 +139,9 @@ class DenchConfig
     }
   end
 
+  # FIXME
   def parse_preprocess_config(config_hash)
-    preprocess = DenchPreparation.new()
+    preprocess = DenchPreprocess.new()
     preprocess_config = config_hash['preprocess']
     return preprocess unless preprocess_config
     if preprocess_config['dench']
@@ -130,6 +151,20 @@ class DenchConfig
       preprocess.node = preprocess_config['node']
     end
     preprocess
+  end
+
+  # FIXME
+  def parse_postprocess_config(config_hash)
+    postprocess = DenchPostprocess.new()
+    postprocess_config = config_hash['postprocess']
+    return postprocess unless postprocess_config
+    if postprocess_config['dench']
+      postprocess.dench = postprocess_config['dench']
+    end
+    if postprocess_config['node']
+      postprocess.node = postprocess_config['node']
+    end
+    postprocess
   end
 
   def to_s()
@@ -248,9 +283,17 @@ class Dench
       processes.each{|process| process.spawn()}
     ensure
       # TODO handle error
+      (@config.postprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
       nodes.each{|node| node.pullall(dstdir)}
       processes.each{|process| process.finalize()}
       nodes.each{|node| node.finalize()}
+    end
+    if @config.postprocess.dench
+      @config.postprocess.dench.each do |p|
+        cmd = "cd #{dstdir}; #{p}"
+        puts(cmd)
+        system(cmd)
+      end
     end
   end
 
