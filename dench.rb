@@ -87,12 +87,12 @@ class DenchPreparation
 end
 
 class DenchConfig
-  attr_reader :nodes, :preparation, :name
+  attr_reader :nodes, :preprocess, :name
 
   def initialize(config_hash)
     @name = "timestamp#{Time.now.to_i}"
     @nodes = parse_node_config(config_hash)
-    @preparation = parse_preparation_config(config_hash)
+    @preprocess = parse_preprocess_config(config_hash)
   end
 
   public
@@ -119,25 +119,25 @@ class DenchConfig
     }
   end
 
-  def parse_preparation_config(config_hash)
-    preparation = DenchPreparation.new()
-    preparation_config = config_hash['preparation']
-    return preparation unless preparation_config
-    if preparation_config['dench']
-      preparation.dench = preparation_config['dench']
+  def parse_preprocess_config(config_hash)
+    preprocess = DenchPreparation.new()
+    preprocess_config = config_hash['preprocess']
+    return preprocess unless preprocess_config
+    if preprocess_config['dench']
+      preprocess.dench = preprocess_config['dench']
     end
-    if preparation_config['node']
-      preparation.node = preparation_config['node']
+    if preprocess_config['node']
+      preprocess.node = preprocess_config['node']
     end
-    preparation
+    preprocess
   end
 
   def to_s()
     [
       "---------- nodes ----------",
       @nodes,
-      "---------- preparation ----------",
-      @preparation,
+      "---------- preprocess ----------",
+      @preprocess,
     ].flatten.join("\n")
   end
 end
@@ -234,8 +234,8 @@ class Dench
     nodes = @config.nodes
     processes = gen_processes(nodes, script_path, parameters)
 
-    if @config.preparation.dench
-      @config.preparation.dench.each do |p|
+    if @config.preprocess.dench
+      @config.preprocess.dench.each do |p|
         cmd = "cd #{dstdir}; #{p}"
         puts(cmd)
         system(cmd)
@@ -243,7 +243,7 @@ class Dench
     end
     begin
       nodes.each{|node| node.prepare()}
-      (@config.preparation.node || []).each{|p| nodes.each{|node| node.exec(p)}}
+      (@config.preprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
       processes.each{|process| process.prepare()}
       processes.each{|process| process.spawn()}
     ensure

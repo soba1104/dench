@@ -8,7 +8,7 @@ nodes:
   -
     host: localhost
     process: 7
-preparation:
+preprocess:
   dench:
     - echo dench0 >> out_dench
     - echo dench1 >> out_dench
