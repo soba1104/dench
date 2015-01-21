@@ -24,27 +24,24 @@ if parameter_path.instance_of?(String) && File.exist?(parameter_path)
 end
 
 class DenchNode
-  attr_reader :id, :host, :process
+  attr_reader :id, :host, :process, :wd
 
   def initialize(id, host, process)
     @id = id
     @host = host
     @process = process
+    @wd = "/tmp/dench.#{@host}.#{@id}" # FIXME
   end
 
   public
   def push(src, dst)
-    pushcmd = "scp -r #{src} #{@host}:#{dst}"
-    puts(pushcmd)
-    system(pushcmd)
+    system("ssh #{@host} 'mkdir -p #{@wd}'")
+    system("scp -r #{src} #{@host}:#{@wd}/#{dst}")
   end
 
-  def pull(src, dst)
-    pullcmd = "scp -r #{@host}:#{src} #{dst}"
-    puts(pullcmd)
-    system(pullcmd)
-    rmcmd = "ssh #{@host} rm -rf #{src}"
-    system(rmcmd)
+  def pullall(dst)
+    system("scp -r #{@host}:#{@wd} #{dst}")
+    system("ssh #{@host} rm -rf #{@wd}")
   end
 
   def to_s()
@@ -160,7 +157,7 @@ class DenchProcess
     @node = node
     @script_path = script_path
     @params = params
-    @remote_tmpdir = "/tmp/dench.#{@node.host}.#{@id}" # FIXME
+    @remote_tmpdir = File.join(@node.wd, @id.to_s)
     @local_tmpdir = File.basename(@remote_tmpdir)
     @package = nil
     @pid = nil
@@ -169,7 +166,7 @@ class DenchProcess
   public
   def prepare()
     @package = create_package()
-    node.push(@package, @remote_tmpdir)
+    node.push(@package, @id.to_s)
   end
 
   def spawn()
@@ -179,9 +176,8 @@ class DenchProcess
     @pid = Process.spawn(sshcmd, :out => STDOUT, :err => STDERR)
   end
 
-  def finalize(dstdir)
+  def finalize()
     Process.waitpid(@pid) if @pid
-    node.pull(@remote_tmpdir, "#{dstdir}/.")
     delete_package(@package)
   end
 
@@ -222,12 +218,15 @@ class Dench
 
     dstdir = "dench.result.#{@config.name}"
     Dir.mkdir(dstdir)
-    processes = gen_processes(@config.nodes, script_path, parameters)
+    nodes = @config.nodes
+    processes = gen_processes(nodes, script_path, parameters)
     begin
       processes.each{|process| process.prepare()}
       processes.each{|process| process.spawn()}
     ensure
-      processes.each{|process| process.finalize(dstdir)}
+      # TODO handle error
+      processes.each{|process| process.finalize()}
+      nodes.each{|node| node.pullall(dstdir)}
     end
   end
 
@@ -240,7 +239,7 @@ class Dench
     }
     processes = []
     nodes.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|node, i|
-      processes.push(DenchProcess.new("#{node.id}.#{i}", node, script_path, process_params[i]))
+      processes.push(DenchProcess.new(i, node, script_path, process_params[i]))
     }
     processes
   end
