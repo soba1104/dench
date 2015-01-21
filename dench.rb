@@ -152,22 +152,23 @@ end
 class DenchProcess
   attr_reader :id, :server, :params
 
-  def initialize(id, server, script_path, params)
+  def initialize(id, timestamp, server, script_path, params)
     @id = id
+    @timestamp = timestamp
     @server = server
     @script_path = script_path
     @params = params
+    @remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{@timestamp}" # FIXME
+    @local_tmpdir = File.basename(@remote_tmpdir)
   end
 
   public
-  def exec(timestamp, dstdir)
+  def exec(dstdir)
     begin
       package = create_package()
-      remote_tmpdir = "/tmp/dench.#{@server.host}.#{@id}.#{timestamp}" # FIXME
-      local_tmpdir = File.basename(remote_tmpdir)
-      server.push(package, remote_tmpdir)
-      ssh(remote_tmpdir)
-      server.pull(remote_tmpdir, "#{dstdir}/.")
+      server.push(package, @remote_tmpdir)
+      ssh(@remote_tmpdir)
+      server.pull(@remote_tmpdir, "#{dstdir}/.")
     ensure
       delete_package(package)
     end
@@ -217,14 +218,14 @@ class Dench
     timestamp = Time.now.to_i()
     dstdir = "dench.result.#{timestamp}"
     Dir.mkdir(dstdir)
-    processes = gen_processes(@config.servers, script_path, parameters)
+    processes = gen_processes(timestamp, @config.servers, script_path, parameters)
     processes.each do |process|
-      process.exec(timestamp, dstdir)
+      process.exec(dstdir)
     end
   end
 
   private
-  def gen_processes(servers, script_path, parameters)
+  def gen_processes(timestamp, servers, script_path, parameters)
     numprocs = servers.inject(0){|i, s| i + s.process}
     process_params = Array.new(numprocs).map{[]}
     parameters.each_with_index{|param, idx|
@@ -232,7 +233,7 @@ class Dench
     }
     processes = []
     servers.map{|s| Array.new(s.process).map{s}}.flatten.each_with_index{|server, id|
-      processes.push(DenchProcess.new(id, server, script_path, process_params[id]))
+      processes.push(DenchProcess.new(id, timestamp, server, script_path, process_params[id]))
     }
     processes
   end
