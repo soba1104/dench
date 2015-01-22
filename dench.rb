@@ -112,12 +112,12 @@ class Package
   end
 
   public
-  def self.create(script_path)
+  def self.create(script_path, runner)
     tmpdir = Dir.mktmpdir(nil, Dir.getwd())
     script = File.basename(script_path)
     package = Package.new(script, tmpdir)
     FileUtils.copy(script_path, File.join(tmpdir, 'command.sh'))
-    File.write(File.join(tmpdir, 'runner.sh'), runner())
+    File.write(File.join(tmpdir, 'runner.sh'), runner)
     package
   end
 
@@ -127,14 +127,6 @@ class Package
 
   def to_s()
     @tmpdir.to_s()
-  end
-
-  private
-  def self.runner()
-    return <<-EOS
-#!/bin/sh
-sh command.sh
-    EOS
   end
 end
 
@@ -172,11 +164,18 @@ class Dench
 
   private
   def create_package(script_path)
-    Package.create(script_path)
+    Package.create(script_path, runner())
   end
 
   def delete_package(package)
     package.destroy() if package
+  end
+
+  def runner()
+    return <<-EOS
+#!/bin/sh
+sh command.sh
+    EOS
   end
 
   def push(package, server, remote_tmpdir)
