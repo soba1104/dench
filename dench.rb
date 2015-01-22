@@ -153,6 +153,8 @@ class Dench
     end
 
     timestamp = Time.now.to_i()
+    local_dstdir = "dench.#{timestamp}"
+    Dir.mkdir(local_dstdir)
     package = nil
     begin
       package = create_package(script_path)
@@ -161,7 +163,7 @@ class Dench
         local_tmpdir = File.basename(remote_tmpdir)
         push(package, server, remote_tmpdir)
         ssh(server, remote_tmpdir)
-        pull(server, remote_tmpdir)
+        pull(server, remote_tmpdir, local_dstdir)
       end
     ensure
       delete_package(package)
@@ -189,9 +191,8 @@ class Dench
     system(sshcmd)
   end
 
-  def pull(server, remote_tmpdir)
-    local_tmpdir = File.basename(remote_tmpdir)
-    pullcmd = "scp -r #{server.host}:#{remote_tmpdir} #{local_tmpdir}"
+  def pull(server, remote_tmpdir, local_dstdir)
+    pullcmd = "scp -r #{server.host}:#{remote_tmpdir} #{local_dstdir}/."
     puts(pullcmd)
     system(pullcmd)
     rmcmd = "ssh #{server.host} rm -rf #{remote_tmpdir}"
