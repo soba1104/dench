@@ -1,0 +1,18 @@
+servers:
+  -
+    host: localhost
+    process: 3
+  -
+    host: localhost
+    process: 5
+  -
+    host: localhost
+    process: 7
+preparation:
+  dench:
+    - echo dench0
+    - echo dench1
+    - echo dench2
+  server:
+    - echo server0
+    - echo server1
