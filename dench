@@ -269,17 +269,6 @@ class DenchProcess
     node.push(@package, @id.to_s)
   end
 
-  def spawn()
-    wd = @remote_tmpdir
-    sshcmd = "ssh #{@node.host} 'cd #{wd}; sh runner.sh > stdout.log 2> stderr.log'"
-    puts(sshcmd)
-    @pid = Process.spawn(sshcmd, :out => STDOUT, :err => STDERR)
-  end
-
-  def join()
-    Process.waitpid(@pid) if @pid
-  end
-
   def finalize()
     delete_package(@package)
   end
@@ -334,8 +323,6 @@ class Dench
       start = Time.now()
       nodes.each{|node| node.spawn('ruby runner.rb')}
       nodes.each{|node| node.join()}
-      #processes.each{|process| process.spawn()}
-      #processes.each{|process| process.join()}
       File.write(File.join(outdir, 'time'), Time.now() - start)
     ensure
       # TODO handle error
