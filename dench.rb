@@ -144,7 +144,7 @@ class Dench
   end
 
   public
-  def run(package)
+  def run(script_path)
     if @config.preparation.dench
       @config.preparation.dench.each do |p|
         puts "##### preparation.dench: #{p} #####"
@@ -152,18 +152,31 @@ class Dench
       end
     end
 
-    local = Socket.gethostname()
     timestamp = Time.now.to_i()
-    @config.servers.each_with_index do |server, idx|
-      remote_tmpdir = "/tmp/dench.#{server.host}.#{idx}.#{timestamp}" # FIXME
-      local_tmpdir = File.basename(remote_tmpdir)
-      push(package, server, remote_tmpdir)
-      ssh(server, remote_tmpdir)
-      pull(server, remote_tmpdir)
+    package = nil
+    begin
+      package = create_package(script_path)
+      @config.servers.each_with_index do |server, idx|
+        remote_tmpdir = "/tmp/dench.#{server.host}.#{idx}.#{timestamp}" # FIXME
+        local_tmpdir = File.basename(remote_tmpdir)
+        push(package, server, remote_tmpdir)
+        ssh(server, remote_tmpdir)
+        pull(server, remote_tmpdir)
+      end
+    ensure
+      delete_package(package)
     end
   end
 
   private
+  def create_package(script_path)
+    Package.create(script_path)
+  end
+
+  def delete_package(package)
+    package.destroy() if package
+  end
+
   def push(package, server, remote_tmpdir)
     pushcmd = "scp -r #{package} #{server.host}:#{remote_tmpdir}"
     puts(pushcmd)
@@ -189,11 +202,4 @@ end
 config_hash = YAML.load(File.read(config_path))
 config = Config.parse(config_hash)
 dench = Dench.new(config)
-
-package = nil
-begin
-  package = Package.create(script_path)
-  dench.run(package)
-ensure
-  package.destroy() if package
-end
+dench.run(script_path)
