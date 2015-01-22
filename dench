@@ -49,6 +49,7 @@ class DenchNode
     @host = host
     @process = process
     @wd = "/tmp/dench.#{@host}.#{@id}" # FIXME
+    @pid = nil
   end
 
   public
@@ -56,6 +57,14 @@ class DenchNode
     mkdir = "ssh #{@host} 'mkdir -p #{@wd}'"
     puts(mkdir)
     system(mkdir)
+    runner_file = Tempfile.new('runner.rb')
+    File.write(runner_file.path, runner())
+    push(runner_file.path, 'runner.rb')
+    runner_file.delete()
+  end
+
+  def join()
+    Process.waitpid(@pid) if @pid
   end
 
   def finalize()
@@ -82,8 +91,26 @@ class DenchNode
     system(ssh)
   end
 
+  def spawn(cmd)
+    ssh = "ssh #{@host} 'cd #{@wd}; #{cmd}'"
+    puts(ssh)
+    @pid = Process.spawn(ssh, :out => STDOUT, :err => STDERR)
+  end
+
   def to_s()
     "-#{@host}: process = #{@process}"
+  end
+
+  private
+  def runner()
+    script = <<-EOS
+dirs = Dir.open('.').entries.find_all{|e| e =~ /[0-9]+/} # FIXME
+dirs.map{|i|
+  Process.spawn("cd \#{i}; sh runner.sh > stdout.log 2> stderr.log", :out => STDOUT, :err => STDERR)
+}.each{|pid|
+  Process.waitpid(pid)
+}
+    EOS
   end
 end
 
@@ -305,8 +332,10 @@ class Dench
       (@config.preprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
       processes.each{|process| process.prepare()}
       start = Time.now()
-      processes.each{|process| process.spawn()}
-      processes.each{|process| process.join()}
+      nodes.each{|node| node.spawn('ruby runner.rb')}
+      nodes.each{|node| node.join()}
+      #processes.each{|process| process.spawn()}
+      #processes.each{|process| process.join()}
       File.write(File.join(outdir, 'time'), Time.now() - start)
     ensure
       # TODO handle error
