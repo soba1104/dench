@@ -13,6 +13,7 @@ opt.on('-s script', '(必須)実行するスクリプトのパス') {|v| options
 opt.on('-n name', '(必須)実行する処理の識別子、出力先やテンポラリディレクトリの名前を識別するのに使う') {|v| options[:name] = v}
 opt.on('-o [output]', '結果の出力先、デフォルトではカレントディレクトリの dench.name に出力') {|v| options[:output] = v}
 opt.on('-p [params]', 'パラメータファイルのパス') {|v| options[:params] = v}
+opt.on('-d description', 'テストの説明文') {|v| options[:description] = v}
 opt.parse!(ARGV)
 
 name = options[:name]
@@ -20,6 +21,7 @@ config_path = options[:config]
 script_path = options[:script]
 parameter_path = options[:params]
 output = options[:output] || "dench.output.#{name}"
+description = options[:description] || ''
 parameters = []
 unless File.exist?(config_path)
   STDERR.puts("#{config_path} does not exist.")
@@ -302,8 +304,9 @@ class Dench
   end
 
   public
-  def run(script_path, parameters, outdir)
+  def run(script_path, parameters, outdir, description)
     Dir.mkdir(outdir)
+    File.write(File.join(outdir, 'description'), description)
     File.write(File.join(outdir, 'config.yml'), @yaml)
     File.write(File.join(outdir, 'params'), parameters.join("\n"))
     nodes = @config.nodes
@@ -356,4 +359,4 @@ class Dench
 end
 
 dench = Dench.new(name, File.read(config_path))
-dench.run(script_path, parameters, output)
+dench.run(script_path, parameters, output, description)
