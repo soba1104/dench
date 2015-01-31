@@ -43,6 +43,34 @@ if (File.exist?(output))
   exit(1)
 end
 
+class DenchNodePackage
+  def initialize(tmpdir)
+    @tmpdir = tmpdir
+  end
+
+  public
+  def self.create()
+    tmpdir = Dir.mktmpdir(nil, Dir.getwd())
+    DenchNodePackage.new(tmpdir)
+  end
+
+  def push(src, dst)
+    FileUtils.cp_r(src, File.join(@tmpdir, dst))
+  end
+
+  def destroy()
+    FileUtils.remove_entry_secure(@tmpdir)
+  end
+
+  def to_str()
+    to_s()
+  end
+
+  def to_s()
+    @tmpdir.to_s()
+  end
+end
+
 class DenchNode
   attr_reader :id, :host, :process, :wd
 
@@ -50,19 +78,30 @@ class DenchNode
     @id = id
     @host = host
     @process = process
+    @package = DenchNodePackage.create()
     @wd = "/tmp/dench.#{@host}.#{@id}" # FIXME
     @pid = nil
   end
 
   public
   def prepare()
+    tarname = 'package.tar.gz'
+    tar = "cd #{@package}; tar zcf #{tarname} *"
     mkdir = "ssh #{@host} 'mkdir -p #{@wd}'"
+    puts(tar)
+    system(tar)
     puts(mkdir)
     system(mkdir)
     runner_file = Tempfile.new('runner.rb')
     File.write(runner_file.path, runner())
     push(runner_file.path, 'runner.rb')
+    push(File.join(@package, tarname), tarname)
     runner_file.delete()
+    exec("tar xf #{tarname}")
+  end
+
+  def add_to_package(src, dst)
+    @package.push(src, dst)
   end
 
   def join()
@@ -73,6 +112,7 @@ class DenchNode
     rm = "ssh #{@host} rm -rf #{@wd}"
     puts(rm)
     system(rm)
+    @package.destroy() if @package
   end
 
   def push(src, dst)
@@ -224,7 +264,7 @@ class DenchConfig
   end
 end
 
-class DenchPackage
+class DenchProcessPackage
   attr_reader :script
 
   def initialize(script, tmpdir)
@@ -236,7 +276,7 @@ class DenchPackage
   def self.create(script_path, runner)
     tmpdir = Dir.mktmpdir(nil, Dir.getwd())
     script = File.basename(script_path)
-    package = DenchPackage.new(script, tmpdir)
+    package = DenchProcessPackage.new(script, tmpdir)
     FileUtils.copy(script_path, File.join(tmpdir, 'command.sh'))
     File.write(File.join(tmpdir, 'runner.sh'), runner)
     package
@@ -244,6 +284,10 @@ class DenchPackage
 
   def destroy()
     FileUtils.remove_entry_secure(@tmpdir)
+  end
+
+  def to_str()
+    to_s()
   end
 
   def to_s()
@@ -268,7 +312,7 @@ class DenchProcess
   public
   def prepare()
     @package = create_package()
-    node.push(@package, @id.to_s)
+    @node.add_to_package(@package, @id.to_s)
   end
 
   def finalize()
@@ -288,7 +332,7 @@ class DenchProcess
   end
 
   def create_package()
-    DenchPackage.create(@script_path, runner())
+    DenchProcessPackage.create(@script_path, runner())
   end
 
   def delete_package(package)
@@ -320,9 +364,9 @@ class Dench
       end
     end
     begin
+      processes.each{|process| process.prepare()}
       nodes.each{|node| node.prepare()}
       (@config.preprocess.node || []).each{|p| nodes.each{|node| node.exec(p)}}
-      processes.each{|process| process.prepare()}
       start = Time.now()
       nodes.each{|node| node.spawn('ruby runner.rb')}
       nodes.each{|node| node.join()}
